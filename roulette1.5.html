@@ -1,0 +1,1561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Roulette</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,600;6..96,700&family=Instrument+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --bg: #276048;
+    --ink: #f3ead2;
+    --muted: #bcd0c3;
+    --line: rgba(243, 234, 210, 0.28);
+    --btn-bg: #d8b466;
+    --btn-ink: #10241e;
+    --serif: "Bodoni Moda", Georgia, "Times New Roman", serif;
+    --sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12402f;
+      --ink: #efe6cf;
+      --muted: #a8c1b2;
+      --line: rgba(239, 230, 207, 0.24);
+      --btn-bg: #d8b466;
+      --btn-ink: #10241e;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12402f;
+    --ink: #efe6cf;
+    --muted: #a8c1b2;
+    --line: rgba(239, 230, 207, 0.24);
+    --btn-bg: #d8b466;
+    --btn-ink: #10241e;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  *, *::before, *::after { box-sizing: inherit; }
+  body {
+    margin: 0;
+    background-color: var(--bg);
+    /* felt: dark grain, light fibres, a soft pool of light at the top, darker edges */
+    background-image:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='a' x='0' y='0' width='100%25' height='100%25'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' seed='4' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1.7 0 0 0 -.7'/></filter><rect width='240' height='240' filter='url(%23a)'/></svg>"),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='b' x='0' y='0' width='100%25' height='100%25'><feTurbulence type='fractalNoise' baseFrequency='.55 .95' numOctaves='2' seed='9' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .9  0 0 0 0 1  0 0 0 0 .9  1.5 0 0 0 -.76'/></filter><rect width='240' height='240' filter='url(%23b)'/></svg>"),
+      radial-gradient(ellipse 80% 55% at 50% 10%, rgba(255, 255, 255, .09), transparent 70%),
+      radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0, 0, 0, .3) 100%);
+    background-size: 240px 240px, 240px 240px, 100% 100%, 100% 100%;
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.5;
+  }
+
+  /* ---------- wheel + result ---------- */
+  main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 21rem;
+    gap: clamp(1.5rem, 4vw, 4rem);
+    align-items: center;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: clamp(1rem, 3vw, 2.5rem);
+  }
+  .stage { width: 100%; max-width: 600px; margin: 0 auto; }
+  canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; }
+
+  h1 {
+    margin: 0;
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+  }
+  .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+  #sound { flex: none; margin-top: .35rem; padding: .4rem .8rem; font-size: .9rem; }
+  .sub { margin: 0.4rem 0 1.5rem; color: var(--muted); }
+
+  .result { display: flex; align-items: center; gap: 1.1rem; margin-bottom: .75rem; }
+  .chip {
+    flex: none;
+    width: 6rem; height: 6rem;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    background: transparent;
+    box-shadow: inset 0 0 0 2px var(--line);
+    color: var(--muted);
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: 2.6rem;
+    transition: background-color .25s, color .25s;
+  }
+  .chip.red   { background: #b3262e; color: #f4ecd6; box-shadow: inset 0 0 0 3px #d8b466; }
+  .chip.black { background: #18171b; color: #f4ecd6; box-shadow: inset 0 0 0 3px #d8b466; }
+  .chip.green { background: #1f7a4d; color: #f4ecd6; box-shadow: inset 0 0 0 3px #d8b466; }
+  .chip.pop   { animation: pop .4s cubic-bezier(.2, 1.6, .4, 1); }
+  @keyframes pop { from { transform: scale(.7); } to { transform: scale(1); } }
+  #desc { margin: 0; font-size: 1.05rem; }
+  #outcome { margin: 0 0 1.25rem; min-height: 3em; color: var(--muted); }
+
+  .spin-btn {
+    display: block;
+    width: 100%;
+    padding: 0.95rem 1.2rem;
+    border: 0;
+    border-radius: 4px;
+    background: var(--btn-bg);
+    color: var(--btn-ink);
+    font: 600 1.1rem var(--sans);
+    cursor: pointer;
+  }
+  .spin-btn:hover:not(:disabled) { filter: brightness(1.1); }
+  .spin-btn:disabled { opacity: .55; cursor: default; }
+  button:focus-visible, input:focus-visible, select:focus-visible, .tablewrap:focus-visible {
+    outline: 3px solid var(--ink);
+    outline-offset: 3px;
+  }
+
+  .panel h2 { margin: 1.75rem 0 0.6rem; font: 600 1rem var(--sans); color: var(--muted); }
+  .hist { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0; padding: 0; list-style: none; }
+  .dot {
+    width: 2.1rem; height: 2.1rem;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font: 600 .82rem var(--serif);
+    color: #f4ecd6;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .25);
+  }
+  .dot.red { background: #b3262e; }
+  .dot.black { background: #18171b; }
+  .dot.green { background: #1f7a4d; }
+  .dot:first-child { box-shadow: inset 0 0 0 2px #d8b466; }
+  #empty, #tally { margin: 0; color: var(--muted); font-size: .95rem; }
+  #tally { margin-top: .75rem; }
+
+  /* ---------- betting ---------- */
+  .bet {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1rem clamp(1rem, 3vw, 2.5rem) 3.5rem;
+    border-top: 1px solid var(--line);
+  }
+  .bet h2 {
+    margin: 1.25rem 0 1rem;
+    font: 700 clamp(1.5rem, 3vw, 2rem)/1.1 var(--serif);
+  }
+  .bet h3 { margin: 2rem 0 .25rem; font: 600 1.05rem var(--sans); }
+  .bar {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: 1.25rem 2.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .stats { display: flex; gap: 2.25rem; align-items: flex-end; }
+  .stat span { display: block; font-size: .9rem; color: var(--muted); }
+  .stat b { display: block; font: 700 1.9rem/1.1 var(--serif); font-variant-numeric: tabular-nums; }
+  .chipctl { display: flex; align-items: center; gap: 1rem; }
+  .bigchip, .pchip {
+    flex: none;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-family: var(--sans);
+    font-weight: 700;
+    background: var(--chip-bg, #1f7a4d);
+    color: var(--chip-fg, #fff);
+    border: 3px dashed var(--chip-edge, #fff);
+    box-shadow: 0 3px 0 rgba(0, 0, 0, .3);
+  }
+  .bigchip { width: 4.6rem; height: 4.6rem; font-size: 1.1rem; }
+  .pchip { width: 2.9rem; height: 2.9rem; font-size: .8rem; padding: 0; cursor: pointer; border-width: 2px; }
+  .pchip[aria-pressed="true"] { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .chipfield label { display: block; font-size: .9rem; color: var(--muted); margin-bottom: .25rem; }
+  .amtrow { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+  #amt {
+    width: 8rem;
+    padding: .5rem .6rem;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ink);
+    font: 600 1.15rem var(--sans);
+    font-variant-numeric: tabular-nums;
+  }
+  .presets { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+
+  .ghost {
+    padding: .55rem .95rem;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ink);
+    font: 600 .95rem var(--sans);
+    cursor: pointer;
+  }
+  .ghost:hover:not(:disabled) { border-color: var(--ink); }
+  .ghost:disabled { opacity: .4; cursor: default; }
+  .ghost small { display: block; font-weight: 400; color: var(--muted); font-size: .78rem; }
+
+  .tablewrap { overflow-x: auto; border-radius: 10px; -webkit-overflow-scrolling: touch; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+  #table { display: block; width: 100%; min-width: 780px; height: auto; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  #table text { pointer-events: none; }
+  #table .num { font: 700 25px var(--serif); fill: #f4ecd6; }
+  #table .lab { font: 600 16px var(--sans); fill: #efe6cf; }
+  #table .chiptxt { font-family: var(--sans); font-weight: 700; }
+  #table .spot { fill: rgba(0, 0, 0, 0); cursor: pointer; }
+  #table .zone:hover { fill: rgba(247, 231, 184, .3); }
+  #table .spot:focus-visible { outline: none; stroke: #fff; stroke-width: 3; }
+  #table.locked .spot { cursor: default; }
+  #table .glow { fill: #f7e7b8; opacity: 0; transition: opacity .12s; }
+  #table .glow.on { opacity: .3; }
+
+  .tablemsg { min-height: 3em; margin: .6rem 0 .25rem; }
+  #hint { margin: 0; color: var(--muted); font-size: .95rem; }
+  #msg { margin: .15rem 0 0; font-weight: 600; }
+  .actions { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-top: .5rem; }
+  .actions .spin-btn { width: auto; margin-left: auto; padding-inline: 2.25rem; }
+
+  .calls { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .6rem; align-items: stretch; }
+  .nb { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: .9rem; }
+  .nb label { color: var(--muted); font-size: .95rem; }
+  #nb {
+    padding: .5rem .6rem; border: 1px solid var(--line); border-radius: 4px;
+    background: transparent; color: var(--ink); font: 600 1rem var(--sans);
+  }
+  #nb option { color: #10241e; background: #f3ead2; }
+  .note { margin: 0; color: var(--muted); font-size: .92rem; max-width: 60ch; }
+
+  details { margin-top: 2rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+  summary { cursor: pointer; font-weight: 600; }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1.5rem; margin: 1rem 0 0; }
+  dt { font-weight: 600; }
+  dd { margin: 0; color: var(--muted); }
+
+  @media (max-width: 820px) {
+    main { grid-template-columns: minmax(0, 1fr); align-items: start; }
+    .actions .spin-btn { margin-left: 0; width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chip.pop { animation: none; }
+    #table .glow { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="stage">
+    <canvas id="wheel" role="img" aria-label="European roulette wheel with 37 pockets"></canvas>
+  </div>
+
+  <section class="panel">
+    <div class="head">
+      <h1>Roulette</h1>
+      <button class="ghost" id="sound" type="button" aria-pressed="true">Sound on</button>
+    </div>
+    <p class="sub">European wheel with a single zero.</p>
+
+    <div class="result" aria-live="polite">
+      <div class="chip" id="chip"><span id="num">–</span></div>
+      <p id="desc">Press Spin to roll the ball.</p>
+    </div>
+    <p id="outcome" aria-live="polite">Place bets on the table below, then spin.</p>
+
+    <button class="spin-btn" type="button">Spin</button>
+
+    <h2>Recent spins</h2>
+    <p id="empty">No spins yet.</p>
+    <ol class="hist" id="hist" aria-label="Recent results, newest first"></ol>
+    <p id="tally"></p>
+  </section>
+</main>
+
+<section class="bet" aria-labelledby="bet-h">
+  <h2 id="bet-h">Place your bets</h2>
+
+  <div class="bar">
+    <div class="stats">
+      <div class="stat"><span>Balance</span><b id="bal">0</b></div>
+      <div class="stat"><span>On the table</span><b id="onTable">0</b></div>
+    </div>
+    <div class="chipctl">
+      <div class="bigchip" id="bigchip" aria-hidden="true">25</div>
+      <div class="chipfield">
+        <label for="amt">Chip value, any amount</label>
+        <div class="amtrow">
+          <input id="amt" type="number" min="0.01" max="100000000" step="any" inputmode="decimal" value="25">
+          <div class="presets" id="presets"></div>
+        </div>
+      </div>
+    </div>
+    <button class="ghost" id="reset" type="button">Reset bankroll</button>
+  </div>
+
+  <div class="tablewrap" tabindex="0" aria-label="Betting table. Scrolls sideways on small screens.">
+    <svg id="table" viewBox="-12 -12 904 354" role="group" aria-label="Roulette betting table"></svg>
+  </div>
+
+  <div class="tablemsg">
+    <p id="hint"></p>
+    <p id="msg" aria-live="polite"></p>
+  </div>
+
+  <div class="actions">
+    <button class="ghost" id="undo" type="button">Undo</button>
+    <button class="ghost" id="clear" type="button">Clear bets</button>
+    <button class="ghost" id="repeat" type="button">Repeat last bets</button>
+    <button class="ghost" id="double" type="button">Double bets</button>
+    <button class="spin-btn" type="button">Spin</button>
+  </div>
+
+  <h3>Call bets</h3>
+  <p class="note">Each button places one chip of your current chip value on every part of the bet. The cost is the chip value times the number of chips.</p>
+  <div class="calls" id="calls"></div>
+  <div class="nb">
+    <label for="nb">Neighbors: a number and the two either side of it on the wheel</label>
+    <select id="nb"></select>
+    <button class="ghost" id="nbGo" type="button">Place 5 chips</button>
+  </div>
+
+  <details>
+    <summary>Bet types and payouts</summary>
+    <dl>
+      <dt>Straight up</dt><dd>One number. Pays 35 to 1.</dd>
+      <dt>Split</dt><dd>Two adjacent numbers, including 0 with 1, 2 or 3. Pays 17 to 1.</dd>
+      <dt>Street</dt><dd>Three numbers in a row. Pays 11 to 1.</dd>
+      <dt>Trio</dt><dd>0-1-2 or 0-2-3. Pays 11 to 1.</dd>
+      <dt>Corner</dt><dd>Four numbers that meet at a point. Pays 8 to 1.</dd>
+      <dt>First four</dt><dd>0-1-2-3. Pays 8 to 1.</dd>
+      <dt>Six line</dt><dd>Two neighboring streets. Pays 5 to 1.</dd>
+      <dt>Dozen or column</dt><dd>Twelve numbers. Pays 2 to 1.</dd>
+      <dt>Red or black, odd or even, 1–18 or 19–36</dt><dd>Eighteen numbers. Pays 1 to 1. Zero loses all of these.</dd>
+    </dl>
+    <p class="note" style="margin-top:1rem">Click a spot to place a chip of the current value. Click again to add more. Right-click a spot to take its chips back. Chips are play money and your balance is saved in this browser.</p>
+  </details>
+</section>
+
+<script>
+(() => {
+  'use strict';
+
+  // European wheel order, clockwise from zero
+  const ORDER = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
+  const REDS = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+  const colorOf = n => n === 0 ? 'green' : REDS.has(n) ? 'red' : 'black';
+  const FILL = { red: '#b3262e', black: '#18171b', green: '#1f7a4d' };
+
+  const TAU = Math.PI * 2;
+  const STEP = TAU / ORDER.length;
+  const pocketAngle = i => -Math.PI / 2 + i * STEP;
+
+  const R_OUT = 0.80, R_IN = 0.55, R_NUM = 0.735;
+  const R_TRACK = 0.865, R_REST = 0.63;
+  const IDLE = 0.12;
+
+  const canvas = document.getElementById('wheel');
+  const ctx = canvas.getContext('2d');
+  const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let size = 0, c = 0, R = 0, baseLayer = null, wheelLayer = null;
+  let wheelAngle = 0;
+  let ball = { ang: -0.9, r: R_TRACK, pocket: null };
+  let highlight = false;
+  let spin = null;
+
+  function randInt(n) {
+    try {
+      const a = new Uint32Array(1);
+      const limit = Math.floor(4294967296 / n) * n;
+      do { crypto.getRandomValues(a); } while (a[0] >= limit);
+      return a[0] % n;
+    } catch (e) {
+      return Math.floor(Math.random() * n);
+    }
+  }
+
+  // =====================================================
+  // Wheel drawing
+  // =====================================================
+  const circ = (g, x, y, r) => { g.beginPath(); g.arc(x, y, r, 0, TAU); };
+
+  function sectorPath(g, i, r0, r1) {
+    const a0 = pocketAngle(i) - STEP / 2, a1 = a0 + STEP;
+    g.beginPath();
+    g.arc(0, 0, r1, a0, a1);
+    g.arc(0, 0, r0, a1, a0, true);
+    g.closePath();
+  }
+
+  function makeLayer() {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = size;
+    return cv;
+  }
+
+  function buildLayers() {
+    baseLayer = makeLayer();
+    wheelLayer = makeLayer();
+
+    let g = baseLayer.getContext('2d');
+    g.save();
+    g.shadowColor = 'rgba(0,0,0,.5)';
+    g.shadowBlur = R * 0.08;
+    g.shadowOffsetY = R * 0.03;
+    g.fillStyle = '#2a180c';
+    circ(g, c, c, R); g.fill();
+    g.restore();
+
+    let lg = g.createLinearGradient(c - R, c - R, c + R, c + R);
+    lg.addColorStop(0, '#8a5c34');
+    lg.addColorStop(0.5, '#4a2d17');
+    lg.addColorStop(1, '#231208');
+    g.fillStyle = lg;
+    circ(g, c, c, R); g.fill();
+
+    g.strokeStyle = 'rgba(255,220,170,.28)';
+    g.lineWidth = R * 0.006;
+    circ(g, c, c, R * 0.975); g.stroke();
+
+    let tg = g.createRadialGradient(c, c, R * 0.78, c, c, R * 0.93);
+    tg.addColorStop(0, '#1b0f07');
+    tg.addColorStop(0.55, '#43291a');
+    tg.addColorStop(1, '#2c1a0e');
+    g.fillStyle = tg;
+    circ(g, c, c, R * 0.93); g.fill();
+
+    g.strokeStyle = 'rgba(255,255,255,.07)';
+    g.lineWidth = R * 0.004;
+    circ(g, c, c, R * R_TRACK); g.stroke();
+
+    g.strokeStyle = '#c9a45c';
+    g.lineWidth = R * 0.012;
+    circ(g, c, c, R * 0.935); g.stroke();
+
+    g.strokeStyle = '#6d4d1e';
+    g.lineWidth = R * 0.016;
+    circ(g, c, c, R * (R_OUT + 0.006)); g.stroke();
+    g.strokeStyle = '#d8b466';
+    g.lineWidth = R * 0.008;
+    circ(g, c, c, R * R_OUT); g.stroke();
+
+    const w = wheelLayer.getContext('2d');
+    w.translate(c, c);
+
+    for (let i = 0; i < ORDER.length; i++) {
+      sectorPath(w, i, R * R_IN, R * R_OUT);
+      w.fillStyle = FILL[colorOf(ORDER[i])];
+      w.fill();
+    }
+
+    const dg = w.createRadialGradient(0, 0, R * R_IN, 0, 0, R * R_OUT);
+    dg.addColorStop(0, 'rgba(0,0,0,.38)');
+    dg.addColorStop(1, 'rgba(255,255,255,.10)');
+    w.beginPath();
+    w.arc(0, 0, R * R_OUT, 0, TAU);
+    w.arc(0, 0, R * R_IN, 0, TAU, true);
+    w.fillStyle = dg;
+    w.fill('evenodd');
+
+    w.strokeStyle = '#d8b466';
+    w.lineWidth = R * 0.006;
+    for (let i = 0; i < ORDER.length; i++) {
+      const a = pocketAngle(i) - STEP / 2;
+      w.beginPath();
+      w.moveTo(Math.cos(a) * R * R_IN, Math.sin(a) * R * R_IN);
+      w.lineTo(Math.cos(a) * R * R_OUT, Math.sin(a) * R * R_OUT);
+      w.stroke();
+    }
+
+    w.fillStyle = '#f4ecd6';
+    w.textAlign = 'center';
+    w.textBaseline = 'middle';
+    w.font = `600 ${R * 0.05}px "Bodoni Moda", Georgia, serif`;
+    for (let i = 0; i < ORDER.length; i++) {
+      w.save();
+      w.rotate(pocketAngle(i) + Math.PI / 2);
+      w.fillText(String(ORDER[i]), 0, -R * R_NUM);
+      w.restore();
+    }
+
+    const cg = w.createRadialGradient(-R * 0.1, -R * 0.1, 0, 0, 0, R * R_IN);
+    cg.addColorStop(0, '#6a4426');
+    cg.addColorStop(1, '#33200f');
+    w.fillStyle = cg;
+    circ(w, 0, 0, R * R_IN); w.fill();
+    w.strokeStyle = '#d8b466';
+    w.lineWidth = R * 0.01;
+    circ(w, 0, 0, R * R_IN); w.stroke();
+    w.strokeStyle = 'rgba(216,180,102,.55)';
+    w.lineWidth = R * 0.005;
+    circ(w, 0, 0, R * 0.36); w.stroke();
+
+    const bg = w.createLinearGradient(0, -R * 0.02, 0, R * 0.02);
+    bg.addColorStop(0, '#f3e2b0');
+    bg.addColorStop(1, '#a67f38');
+    for (let k = 0; k < 4; k++) {
+      w.save();
+      w.rotate(k * Math.PI / 2);
+      w.fillStyle = bg;
+      w.fillRect(0, -R * 0.016, R * 0.36, R * 0.032);
+      const kg = w.createRadialGradient(R * 0.36 - R * 0.008, -R * 0.01, 0, R * 0.36, 0, R * 0.032);
+      kg.addColorStop(0, '#fff3cf');
+      kg.addColorStop(1, '#a67f38');
+      w.fillStyle = kg;
+      circ(w, R * 0.36, 0, R * 0.03); w.fill();
+      w.restore();
+    }
+    const hg = w.createRadialGradient(-R * 0.03, -R * 0.03, 0, 0, 0, R * 0.1);
+    hg.addColorStop(0, '#fff3cf');
+    hg.addColorStop(0.5, '#c9a45c');
+    hg.addColorStop(1, '#6d4d1e');
+    w.fillStyle = hg;
+    circ(w, 0, 0, R * 0.1); w.fill();
+  }
+
+  function draw() {
+    if (!size || !baseLayer) return;
+    ctx.clearRect(0, 0, size, size);
+    ctx.drawImage(baseLayer, 0, 0);
+
+    ctx.save();
+    ctx.translate(c, c);
+    ctx.rotate(wheelAngle);
+    ctx.drawImage(wheelLayer, -c, -c);
+    if (highlight && ball.pocket !== null) {
+      sectorPath(ctx, ball.pocket, R * R_IN, R * R_OUT);
+      ctx.strokeStyle = '#f7e7b8';
+      ctx.lineWidth = R * 0.012;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    const gl = ctx.createRadialGradient(c - R * 0.3, c - R * 0.38, 0, c - R * 0.3, c - R * 0.38, R * 1.0);
+    gl.addColorStop(0, 'rgba(255,255,255,.14)');
+    gl.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gl;
+    circ(ctx, c, c, R * 0.93); ctx.fill();
+
+    drawBall();
+  }
+
+  function drawBall() {
+    const br = R * 0.026;
+    const x = c + Math.cos(ball.ang) * ball.r * R;
+    const y = c + Math.sin(ball.ang) * ball.r * R;
+    ctx.fillStyle = 'rgba(0,0,0,.4)';
+    ctx.beginPath();
+    ctx.ellipse(x + br * 0.35, y + br * 0.5, br * 1.05, br * 0.9, 0, 0, TAU);
+    ctx.fill();
+    const bgd = ctx.createRadialGradient(x - br * 0.35, y - br * 0.4, 0, x, y, br);
+    bgd.addColorStop(0, '#ffffff');
+    bgd.addColorStop(0.55, '#ebe7dc');
+    bgd.addColorStop(1, '#928e84');
+    ctx.fillStyle = bgd;
+    circ(ctx, x, y, br); ctx.fill();
+  }
+
+  // =====================================================
+  // Money helpers (everything is stored in cents)
+  // =====================================================
+  const START = 100000;                       // 1,000 chips
+  const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+  const nf2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = cents => cents % 100 === 0 ? nf0.format(cents / 100) : nf2.format(cents / 100);
+  const signed = cents => (cents > 0 ? '+' : cents < 0 ? '−' : '') + fmt(Math.abs(cents));
+  const trim1 = x => String(Math.round(x * 10) / 10);
+  function short(cents) {
+    const v = cents / 100;
+    if (v >= 1e6) return trim1(v / 1e6) + 'M';
+    if (v >= 1000) return trim1(v / 1e3) + 'k';
+    return cents % 100 === 0 ? String(v) : v.toFixed(2);
+  }
+
+  const TIERS = [
+    { bg: '#e8e3d4', fg: '#2b2a26', edge: '#9c9686' },   // under 5
+    { bg: '#b3262e', fg: '#ffffff', edge: '#f1c9c9' },   // under 25
+    { bg: '#1f7a4d', fg: '#ffffff', edge: '#bfe6d1' },   // under 100
+    { bg: '#1d1d24', fg: '#ffffff', edge: '#8a8a99' },   // under 500
+    { bg: '#5b3a8c', fg: '#ffffff', edge: '#d6c5f0' },   // under 5,000
+    { bg: '#d8b466', fg: '#2b1d05', edge: '#6d4d1e' }    // 5,000 and up
+  ];
+  function tierOf(cents) {
+    const v = cents / 100;
+    return TIERS[v < 5 ? 0 : v < 25 ? 1 : v < 100 ? 2 : v < 500 ? 3 : v < 5000 ? 4 : 5];
+  }
+  function applyTier(elm, cents) {
+    const t = tierOf(cents);
+    elm.style.setProperty('--chip-bg', t.bg);
+    elm.style.setProperty('--chip-fg', t.fg);
+    elm.style.setProperty('--chip-edge', t.edge);
+  }
+
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+
+  // =====================================================
+  // Sound (synthesized with Web Audio, no files needed)
+  // =====================================================
+  const Sound = (() => {
+    let ac = null, master = null, noise = null, roll = null;
+    let muted = store.get('roulette.muted') === '1';
+
+    function ensure() {
+      if (muted) return null;
+      if (!ac) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        try { ac = new AC(); } catch (e) { return null; }
+        master = ac.createGain();
+        master.gain.value = 0.7;
+        const comp = ac.createDynamicsCompressor();
+        master.connect(comp);
+        comp.connect(ac.destination);
+        const len = Math.floor(ac.sampleRate * 2);
+        noise = ac.createBuffer(1, len, ac.sampleRate);
+        const d = noise.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      }
+      if (ac.state === 'suspended') { try { ac.resume(); } catch (e) {} }
+      return ac;
+    }
+
+    // a short filtered noise burst (clicks, clacks, thumps)
+    function burst(t, dur, freq, q, peak, type) {
+      const src = ac.createBufferSource();
+      src.buffer = noise;
+      const f = ac.createBiquadFilter();
+      f.type = type || 'bandpass';
+      f.frequency.value = freq;
+      f.Q.value = q || 1;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(peak, t + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(f); f.connect(g); g.connect(master);
+      src.start(t, Math.random() * 1.5, dur + 0.05);
+    }
+
+    // a short pitched note
+    function tone(t, freq, dur, peak, type, endFreq, attack) {
+      const o = ac.createOscillator();
+      o.type = type || 'sine';
+      o.frequency.setValueAtTime(freq, t);
+      if (endFreq) o.frequency.exponentialRampToValueAtTime(endFreq, t + dur);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(peak, t + (attack || 0.005));
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(master);
+      o.start(t);
+      o.stop(t + dur + 0.05);
+    }
+
+    // A loopable texture of tiny hard impacts: what a ball rolling over a
+    // polished wooden track really sounds like (gritty, not a smooth hiss).
+    let rollBuf = null;
+    function makeRollBuffer() {
+      const sr = ac.sampleRate, len = Math.floor(sr * 2.5);
+      const buf = ac.createBuffer(1, len, sr);
+      const d = buf.getChannelData(0);
+      for (let n = 0; n < 2600; n++) {
+        const start = Math.floor(Math.random() * len);
+        const amp = 0.25 + Math.random() * Math.random() * 1.5;   // mostly soft, a few sharper knocks
+        const f = 1300 + Math.random() * 2700;
+        const tau = sr * (0.0007 + Math.random() * 0.0015);
+        const w = 2 * Math.PI * f / sr;
+        const cnt = Math.floor(tau * 5);
+        for (let i = 0; i < cnt; i++) d[(start + i) % len] += amp * Math.sin(w * i) * Math.exp(-i / tau);
+      }
+      let sum = 0;
+      for (let i = 0; i < len; i++) sum += d[i] * d[i];
+      const k = 0.22 / (Math.sqrt(sum / len) || 1);
+      for (let i = 0; i < len; i++) d[i] = Math.tanh(d[i] * k);
+      return buf;
+    }
+
+    function stopRoll() {
+      if (!roll || !ac) { roll = null; return; }
+      const t = ac.currentTime;
+      [roll.bus, roll.gWheel].forEach(g => {
+        g.gain.cancelScheduledValues(t);
+        g.gain.setValueAtTime(g.gain.value, t);
+        g.gain.setTargetAtTime(0, t, 0.06);
+      });
+      roll.stoppers.forEach(n => { try { n.stop(t + 0.5); } catch (e) {} });
+      roll = null;
+    }
+
+    function startRoll() {
+      stopRoll();
+      if (!rollBuf) rollBuf = makeRollBuffer();
+
+      // everything the ball makes goes through one bus that pans with the ball
+      const bus = ac.createGain();
+      const pan = ac.createStereoPanner ? ac.createStereoPanner() : null;
+      if (pan) { bus.connect(pan); pan.connect(master); } else { bus.connect(master); }
+
+      // pulse: the sound swells and fades once per lap of the ball
+      const am = ac.createGain();
+      am.gain.value = 0.65;
+      const lfo = ac.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = 2;
+      const lfoDepth = ac.createGain();
+      lfoDepth.gain.value = 0.3;
+      lfo.connect(lfoDepth); lfoDepth.connect(am.gain);
+      am.connect(bus);
+
+      // 1) the ball itself: gritty stream of tiny impacts on the track
+      const grit = ac.createBufferSource();
+      grit.buffer = rollBuf; grit.loop = true;
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 3000; lp.Q.value = 0.7;
+      const gGrit = ac.createGain();
+      gGrit.gain.value = 0;
+      grit.connect(lp); lp.connect(gGrit); gGrit.connect(am);
+
+      // 2) the hollow rumble of the wooden bowl
+      const rum = ac.createBufferSource();
+      rum.buffer = noise; rum.loop = true;
+      const rbp = ac.createBiquadFilter();
+      rbp.type = 'bandpass'; rbp.frequency.value = 260; rbp.Q.value = 0.7;
+      const gRum = ac.createGain();
+      gRum.gain.value = 0;
+      rum.connect(rbp); rbp.connect(gRum); gRum.connect(am);
+
+      // 3) the wheel head turning on its bearing: soft, low whirr
+      const whirr = ac.createBufferSource();
+      whirr.buffer = noise; whirr.loop = true;
+      const wbp = ac.createBiquadFilter();
+      wbp.type = 'bandpass'; wbp.frequency.value = 420; wbp.Q.value = 0.8;
+      const gWheel = ac.createGain();
+      gWheel.gain.value = 0;
+      whirr.connect(wbp); wbp.connect(gWheel); gWheel.connect(master);
+
+      grit.start(0, Math.random() * 2);
+      rum.start(0, Math.random() * 1.5);
+      whirr.start(0, Math.random() * 1.5);
+      lfo.start();
+      roll = { bus, pan, grit, lp, gGrit, gRum, gWheel, lfo, lfoDepth,
+               stoppers: [grit, rum, whirr, lfo] };
+    }
+
+    // filtered noise that sweeps in pitch (whooshes, scrapes)
+    function sweep(t, dur, f0, f1, f2, peak, q) {
+      const src = ac.createBufferSource();
+      src.buffer = noise;
+      const f = ac.createBiquadFilter();
+      f.type = 'bandpass';
+      f.Q.value = q || 1;
+      f.frequency.setValueAtTime(f0, t);
+      f.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.4);
+      f.frequency.exponentialRampToValueAtTime(f2, t + dur);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(peak, t + dur * 0.35);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(f); f.connect(g); g.connect(master);
+      src.start(t, Math.random() * 1.5, dur + 0.05);
+    }
+
+    // a hard ball striking a metal fret set in a wooden wheel:
+    // sharp contact + metallic ring + woody knock, slightly different every time
+    function clack(t, vol) {
+      const j = () => 0.9 + Math.random() * 0.2;
+      burst(t, 0.012, 3400 * j(), 2, vol);
+      burst(t, 0.03, 900 * j(), 1.2, vol * 0.7, 'lowpass');
+      tone(t, 2300 * j(), 0.06, vol * 0.3, 'sine');
+      tone(t, 480 * j(), 0.05, vol * 0.55, 'sine', 330);
+    }
+
+    return {
+      isMuted: () => muted,
+      setMuted(m) {
+        muted = m;
+        store.set('roulette.muted', m ? '1' : '0');
+        if (m) stopRoll();
+      },
+
+      // chips landing on felt; larger chips sound lower, several chips cascade
+      chip(cents, count) {
+        const a = ensure(); if (!a) return;
+        const pitch = 3000 - Math.min(1400, Math.log10(Math.max(1, cents / 100) + 1) * 450);
+        const n = Math.min(count || 1, 6);
+        for (let k = 0; k < n; k++) {
+          const t = a.currentTime + k * 0.055;
+          burst(t, 0.03, pitch * (0.9 + Math.random() * 0.2), 3, 0.55);
+          burst(t + 0.03, 0.025, pitch * 1.25, 4, 0.4);
+          tone(t, 170, 0.09, 0.28, 'sine', 85);
+        }
+      },
+      remove() {
+        const a = ensure(); if (!a) return;
+        const t = a.currentTime;
+        burst(t, 0.04, 4200, 2, 0.3);
+        tone(t, 600, 0.07, 0.1, 'triangle', 300);
+      },
+      pip() {
+        const a = ensure(); if (!a) return;
+        tone(a.currentTime, 900, 0.05, 0.1, 'sine');
+      },
+      error() {
+        const a = ensure(); if (!a) return;
+        const t = a.currentTime;
+        tone(t, 140, 0.16, 0.16, 'sawtooth', 110);
+        tone(t + 0.14, 120, 0.2, 0.16, 'sawtooth', 90);
+      },
+
+      // wheel and ball
+      spinStart() {
+        const a = ensure(); if (!a) return;
+        const t = a.currentTime;
+        // the croupier sets the wheel turning: a soft low whoosh
+        sweep(t, 0.9, 200, 700, 250, 0.16, 0.9);
+        // ...and flicks the ball the other way: a quick scrape and a click
+        sweep(t + 0.12, 0.3, 3200, 1300, 800, 0.2, 1.5);
+        clack(t + 0.1, 0.3);
+        startRoll();
+      },
+      roll(speed, onTrack, wheelSpeed, ang) {
+        if (!roll || !ac) return;
+        const t = ac.currentTime;
+        const fast = Math.min(1, speed / 14);
+        if (onTrack) {
+          roll.gGrit.gain.setTargetAtTime(0.14 + 0.36 * fast, t, 0.06);
+          roll.gRum.gain.setTargetAtTime(0.3 + 0.4 * fast, t, 0.06);
+          roll.lp.frequency.setTargetAtTime(1700 + 2800 * fast, t, 0.05);
+        } else {
+          // ball has dropped off the track: the smooth roll gives way to clacks
+          roll.gGrit.gain.setTargetAtTime(0.05, t, 0.08);
+          roll.gRum.gain.setTargetAtTime(0.08, t, 0.08);
+          roll.lp.frequency.setTargetAtTime(1300, t, 0.08);
+        }
+        roll.grit.playbackRate.setTargetAtTime(0.75 + 0.6 * fast, t, 0.05);
+        roll.lfo.frequency.setTargetAtTime(Math.max(0.25, speed / (Math.PI * 2)), t, 0.05);
+        roll.lfoDepth.gain.setTargetAtTime(0.18 + 0.25 * (1 - fast), t, 0.05);
+        roll.gWheel.gain.setTargetAtTime(Math.min(0.16, (wheelSpeed || 0) * 0.06), t, 0.1);
+        if (roll.pan) roll.pan.pan.setTargetAtTime(Math.cos(ang || 0) * 0.6, t, 0.04);
+      },
+      stopRoll,
+      ballTick(relSpeed) {
+        const a = ensure(); if (!a) return;
+        clack(a.currentTime, Math.min(0.4, 0.1 + relSpeed * 0.05));
+      },
+      land() {
+        const a = ensure(); if (!a) return;
+        const t = a.currentTime;
+        // ball drops into its pocket, then bounces between the fret walls
+        tone(t, 140, 0.18, 0.28, 'sine', 70);
+        burst(t, 0.1, 700, 1, 0.25, 'lowpass');
+        let dt = 0, gap = 0.11, vol = 0.5;
+        for (let i = 0; i < 6; i++) {
+          clack(t + dt, vol);
+          dt += gap * (0.75 + Math.random() * 0.5);
+          gap *= 0.66;
+          vol *= 0.7;
+        }
+      },
+
+      // win / lose after the ball settles
+      result(staked, returned) {
+        const a = ensure(); if (!a || !staked) return;
+        const t0 = a.currentTime + 0.55;
+        const net = returned - staked;
+        if (net > 0) {
+          const ratio = returned / staked;
+          const steps = ratio >= 10 ? 7 : ratio >= 3 ? 5 : 4;
+          const base = 523.25;
+          const mult = [1, 1.25, 1.5, 2, 2.5, 3, 4];
+          for (let i = 0; i < steps; i++) {
+            tone(t0 + i * 0.09, base * mult[i], 0.5, 0.22, 'triangle');
+            tone(t0 + i * 0.09, base * mult[i] * 2, 0.35, 0.07, 'sine');
+          }
+          const coins = Math.min(12, 3 + Math.round(Math.log2(ratio + 1) * 2));
+          for (let j = 0; j < coins; j++) {
+            tone(t0 + 0.05 + j * 0.055 + Math.random() * 0.02, 2400 + Math.random() * 1200, 0.09, 0.09, 'sine');
+          }
+        } else if (returned > 0) {
+          tone(t0, 392, 0.3, 0.16, 'triangle');
+          tone(t0 + 0.12, 494, 0.4, 0.16, 'triangle');
+        } else {
+          tone(t0, 294, 0.35, 0.18, 'triangle', 233);
+          tone(t0 + 0.22, 220, 0.5, 0.16, 'triangle', 165);
+        }
+      }
+    };
+  })();
+
+  // =====================================================
+  // Bet catalogue and betting table (SVG)
+  // =====================================================
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.getElementById('table');
+  const CAT = {};      // key -> { key, label, nums:Set, pays, ax, ay }
+  const glow = {};     // number -> svg element used to light up covered numbers
+
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function label(parent, str, x, y, cls) {
+    const t = el('text', { x, y, class: cls, 'text-anchor': 'middle', 'dominant-baseline': 'central' }, parent);
+    t.textContent = str;
+    return t;
+  }
+
+  const CW = 60, CH = 70, X0 = 80, Y3 = 210;
+  const colOf = n => Math.floor((n - 1) / 3);
+  const rowOf = n => 2 - ((n - 1) % 3);       // 0 = top row (3,6,9...)
+  const nx = n => X0 + colOf(n) * CW;
+  const ny = n => rowOf(n) * CH;
+  const splitKey = (a, b) => `p${Math.min(a, b)}-${Math.max(a, b)}`;
+  const ZERO_PATH = 'M80 0H40A40 40 0 0 0 0 40V170A40 40 0 0 0 40 210H80Z';
+
+  let gChips, gWin;
+
+  function define(key, lab, nums, pays, ax, ay) {
+    CAT[key] = { key, label: lab, nums: new Set(nums), pays, ax, ay };
+  }
+
+  function buildTable() {
+    const range = (a, b) => { const r = []; for (let i = a; i <= b; i++) r.push(i); return r; };
+
+    el('rect', { x: -12, y: -12, width: 904, height: 354, rx: 14, fill: '#0a3526', stroke: '#d8b466', 'stroke-opacity': .55, 'stroke-width': 2 }, svg);
+    const gV = el('g', { 'pointer-events': 'none' }, svg);
+    const gG = el('g', { 'pointer-events': 'none' }, svg);
+    const gS = el('g', {}, svg);
+    const gZ = el('g', {}, svg);
+    gWin = el('g', { 'pointer-events': 'none' }, svg);
+    gChips = el('g', { 'pointer-events': 'none' }, svg);
+
+    const brass = { stroke: '#d8b466', 'stroke-width': 2 };
+
+    // ----- visuals -----
+    el('path', Object.assign({ d: ZERO_PATH, fill: FILL.green }, brass), gV);
+    label(gV, '0', 40, 105, 'num');
+    for (let n = 1; n <= 36; n++) {
+      el('rect', Object.assign({ x: nx(n), y: ny(n), width: CW, height: CH, fill: colorOf(n) === 'red' ? FILL.red : '#141316' }, brass), gV);
+      label(gV, String(n), nx(n) + CW / 2, ny(n) + CH / 2, 'num');
+    }
+    for (let k = 1; k <= 3; k++) {
+      const y = k === 1 ? 140 : k === 2 ? 70 : 0;
+      el('rect', Object.assign({ x: 800, y, width: 80, height: CH, fill: 'none' }, brass), gV);
+      label(gV, '2 to 1', 840, y + CH / 2, 'lab');
+    }
+    ['1st 12', '2nd 12', '3rd 12'].forEach((t, i) => {
+      el('rect', Object.assign({ x: X0 + 240 * i, y: Y3, width: 240, height: 60, fill: 'none' }, brass), gV);
+      label(gV, t, X0 + 240 * i + 120, Y3 + 30, 'lab');
+    });
+    const outside = [
+      ['low', '1–18', range(1, 18), 'Low, 1 to 18'],
+      ['even', 'Even', range(1, 36).filter(n => n % 2 === 0), 'Even'],
+      ['red', null, [...REDS], 'Red'],
+      ['black', null, range(1, 36).filter(n => !REDS.has(n)), 'Black'],
+      ['odd', 'Odd', range(1, 36).filter(n => n % 2 === 1), 'Odd'],
+      ['high', '19–36', range(19, 36), 'High, 19 to 36']
+    ];
+    outside.forEach(([key, txt, nums, lab], i) => {
+      const x = X0 + 120 * i, y = 270;
+      el('rect', Object.assign({ x, y, width: 120, height: 60, fill: 'none' }, brass), gV);
+      if (txt) label(gV, txt, x + 60, y + 30, 'lab');
+      else el('polygon', Object.assign({ points: `${x + 60},${y + 10} ${x + 90},${y + 30} ${x + 60},${y + 50} ${x + 30},${y + 30}`, fill: key === 'red' ? FILL.red : '#141316' }, brass), gV);
+      define(key, lab, nums, 1, x + 60, y + 30);
+    });
+
+    // ----- glow overlays (light up the numbers a bet covers) -----
+    glow[0] = el('path', { d: ZERO_PATH, class: 'glow' }, gG);
+    for (let n = 1; n <= 36; n++) {
+      glow[n] = el('rect', { x: nx(n), y: ny(n), width: CW, height: CH, class: 'glow' }, gG);
+    }
+
+    // ----- clickable spots -----
+    function spot(g, key, tag, attrs, cls, focusable) {
+      const s = el(tag, Object.assign({ class: cls, 'data-key': key, 'aria-label': CAT[key].label }, attrs), g);
+      if (focusable) { s.setAttribute('tabindex', '0'); s.setAttribute('role', 'button'); }
+      return s;
+    }
+
+    // straight up
+    define('s0', 'Straight up 0', [0], 35, 40, 105);
+    spot(gS, 's0', 'path', { d: ZERO_PATH }, 'spot', true);
+    for (let n = 1; n <= 36; n++) {
+      define('s' + n, `Straight up ${n}`, [n], 35, nx(n) + CW / 2, ny(n) + CH / 2);
+      spot(gS, 's' + n, 'rect', { x: nx(n), y: ny(n), width: CW, height: CH }, 'spot', true);
+    }
+    // columns
+    [[1, 140], [2, 70], [3, 0]].forEach(([k, y]) => {
+      define('col' + k, `Column ${k}`, range(1, 36).filter(n => n % 3 === k % 3), 2, 840, y + CH / 2);
+      spot(gS, 'col' + k, 'rect', { x: 800, y, width: 80, height: CH }, 'spot', true);
+    });
+    // dozens
+    for (let k = 1; k <= 3; k++) {
+      define('d' + k, `Dozen ${k}, ${(k - 1) * 12 + 1} to ${k * 12}`, range((k - 1) * 12 + 1, k * 12), 2, X0 + 240 * (k - 1) + 120, Y3 + 30);
+      spot(gS, 'd' + k, 'rect', { x: X0 + 240 * (k - 1), y: Y3, width: 240, height: 60 }, 'spot', true);
+    }
+    // even-money bets
+    outside.forEach(([key], i) => {
+      spot(gS, key, 'rect', { x: X0 + 120 * i, y: 270, width: 120, height: 60 }, 'spot', true);
+    });
+
+    // border zones
+    const zone = (key, x, y, w, h) => spot(gZ, key, 'rect', { x, y, width: w, height: h }, 'spot zone', false);
+
+    // splits between columns (n and n+3)
+    for (let n = 1; n <= 33; n++) {
+      const key = splitKey(n, n + 3);
+      define(key, `Split ${n}/${n + 3}`, [n, n + 3], 17, nx(n) + CW, ny(n) + CH / 2);
+      zone(key, nx(n) + CW - 8, ny(n) + 8, 16, CH - 16);
+    }
+    // splits between rows (n and n+1)
+    for (let n = 1; n <= 35; n++) {
+      if (n % 3 === 0) continue;
+      const key = splitKey(n, n + 1);
+      define(key, `Split ${n}/${n + 1}`, [n, n + 1], 17, nx(n) + CW / 2, ny(n));
+      zone(key, nx(n) + 8, ny(n) - 8, CW - 16, 16);
+    }
+    // corners
+    for (let n = 1; n <= 32; n++) {
+      if (n % 3 === 0) continue;
+      const key = 'c' + n;
+      define(key, `Corner ${n}/${n + 1}/${n + 3}/${n + 4}`, [n, n + 1, n + 3, n + 4], 8, nx(n) + CW, ny(n));
+      zone(key, nx(n) + CW - 8, ny(n) - 8, 16, 16);
+    }
+    // streets and six lines
+    for (let j = 0; j < 12; j++) {
+      const n0 = 3 * j + 1, x = X0 + j * CW;
+      define('t' + n0, `Street ${n0}–${n0 + 2}`, [n0, n0 + 1, n0 + 2], 11, x + CW / 2, Y3);
+      zone('t' + n0, x + 8, Y3 - 8, CW - 16, 16);
+      if (j < 11) {
+        define('x' + n0, `Six line ${n0}–${n0 + 5}`, range(n0, n0 + 5), 5, x + CW, Y3);
+        zone('x' + n0, x + CW - 8, Y3 - 8, 16, 16);
+      }
+    }
+    // zero: splits, trios, first four
+    [[3, 35], [2, 105], [1, 175]].forEach(([k, y]) => {
+      const key = splitKey(0, k);
+      define(key, `Split 0/${k}`, [0, k], 17, 80, y);
+      zone(key, 72, y - 27, 16, 54);
+    });
+    define('r0-2-3', 'Trio 0/2/3', [0, 2, 3], 11, 80, 70);
+    zone('r0-2-3', 72, 62, 16, 16);
+    define('r0-1-2', 'Trio 0/1/2', [0, 1, 2], 11, 80, 140);
+    zone('r0-1-2', 72, 132, 16, 16);
+    define('f0', 'First four 0/1/2/3', [0, 1, 2, 3], 8, 80, 210);
+    zone('f0', 72, 202, 16, 16);
+  }
+
+  // =====================================================
+  // Game state
+  // =====================================================
+  let balance = parseInt(store.get('roulette.bankroll'), 10);
+  if (!(balance >= 0)) balance = START;
+  const bets = new Map();        // key -> cents
+  let events = [];               // placement groups, for Undo
+  let lastBets = new Map();      // bets from the previous spin
+  let settled = null;            // { n, results: Map(key -> 'win'|'lose') } once a spin is paid
+
+  const $ = id => document.getElementById(id);
+  const balEl = $('bal'), onEl = $('onTable'), amt = $('amt'), bigchip = $('bigchip');
+  const hintEl = $('hint'), msgEl = $('msg');
+  const undoBtn = $('undo'), clearBtn = $('clear'), repeatBtn = $('repeat'), doubleBtn = $('double');
+  const spinBtns = [...document.querySelectorAll('.spin-btn')];
+  let spinSource = null;
+
+  const DEFAULT_HINT = 'Click a spot to place a chip. Right-click a spot to take its chips back.';
+  const say = t => { msgEl.textContent = t; };
+  const sumBets = () => { let s = 0; bets.forEach(v => { s += v; }); return s; };
+
+  const MAX_CHIP = 100000000;   // highest allowed chip value
+
+  function chipCents() {
+    const v = parseFloat(amt.value);
+    if (!isFinite(v) || v <= 0) return null;
+    return Math.max(1, Math.round(Math.min(v, MAX_CHIP) * 100));
+  }
+
+  function renderChips() {
+    gChips.textContent = '';
+    bets.forEach((cents, key) => {
+      const b = CAT[key];
+      const st = settled ? settled.results.get(key) : null;
+      const g = el('g', { transform: `translate(${b.ax} ${b.ay})`, opacity: st === 'lose' ? 0.4 : 1 }, gChips);
+      const t = tierOf(cents);
+      if (st === 'win') el('circle', { r: 22, fill: 'none', stroke: '#f7e7b8', 'stroke-width': 3 }, g);
+      el('circle', { cy: 2.5, r: 16, fill: 'rgba(0,0,0,.4)' }, g);
+      el('circle', { r: 16, fill: t.bg, stroke: 'rgba(0,0,0,.45)', 'stroke-width': 1.5 }, g);
+      el('circle', { r: 12.5, fill: 'none', stroke: t.edge, 'stroke-width': 2.5, 'stroke-dasharray': '4.2 3.6' }, g);
+      const s = short(cents);
+      const tx = el('text', {
+        class: 'chiptxt', 'text-anchor': 'middle', 'dominant-baseline': 'central',
+        fill: t.fg, 'font-size': s.length >= 5 ? 8 : s.length === 4 ? 9.5 : 11
+      }, g);
+      tx.textContent = s;
+    });
+  }
+
+  function showWinRing(n) {
+    gWin.textContent = '';
+    const attrs = { fill: 'none', stroke: '#f7e7b8', 'stroke-width': 4 };
+    if (n === 0) el('path', Object.assign({ d: ZERO_PATH }, attrs), gWin);
+    else el('rect', Object.assign({ x: nx(n) + 2, y: ny(n) + 2, width: CW - 4, height: CH - 4 }, attrs), gWin);
+  }
+
+  function resetTable() {
+    bets.clear();
+    events = [];
+    settled = null;
+    gWin.textContent = '';
+    renderChips();
+  }
+
+  function sync() {
+    const on = settled ? 0 : sumBets();
+    balEl.textContent = fmt(balance);
+    onEl.textContent = fmt(on);
+    undoBtn.disabled = !!spin || !!settled || !events.length;
+    clearBtn.disabled = !!spin || !bets.size;
+    repeatBtn.disabled = !!spin || !lastBets.size || (!settled && bets.size > 0);
+    doubleBtn.disabled = !!spin || !!settled || !bets.size || balance < on;
+    svg.classList.toggle('locked', !!spin);
+    store.set('roulette.bankroll', String(balance + on));
+    refreshChip();
+  }
+
+  function refreshChip() {
+    const cents = chipCents();
+    bigchip.textContent = cents === null ? '?' : short(cents);
+    applyTier(bigchip, cents === null ? 0 : cents);
+    document.querySelectorAll('.pchip').forEach(b => {
+      b.setAttribute('aria-pressed', String(cents !== null && cents === Number(b.dataset.cents)));
+    });
+  }
+
+  function placeItems(items) {
+    if (spin) return false;
+    if (settled) resetTable();
+    const total = items.reduce((s, it) => s + it[1], 0);
+    if (total <= 0) return false;
+    if (total > balance) {
+      say(`Not enough chips. You have ${fmt(balance)} and this bet needs ${fmt(total)}.`);
+      Sound.error();
+      sync();
+      return false;
+    }
+    say('');
+    items.forEach(([k, cents]) => {
+      bets.set(k, (bets.get(k) || 0) + cents);
+      balance -= cents;
+    });
+    events.push(items.map(it => [it[0], it[1]]));
+    Sound.chip(Math.max(...items.map(it => it[1])), items.length);
+    renderChips();
+    sync();
+    return true;
+  }
+
+  function placeOne(key) {
+    if (spin) return;
+    const cents = chipCents();
+    if (cents === null) { say('Enter a chip value above 0.'); Sound.error(); return; }
+    placeItems([[key, cents]]);
+  }
+
+  function removeBet(key) {
+    if (spin) return;
+    if (settled) { resetTable(); sync(); return; }
+    const cents = bets.get(key);
+    if (!cents) return;
+    bets.delete(key);
+    balance += cents;
+    events = events.map(ev => ev.filter(it => it[0] !== key)).filter(ev => ev.length);
+    Sound.remove();
+    say('');
+    renderChips();
+    sync();
+  }
+
+  function undo() {
+    if (spin || settled || !events.length) return;
+    Sound.remove();
+    events.pop().forEach(([k, cents]) => {
+      const left = (bets.get(k) || 0) - cents;
+      if (left > 0) bets.set(k, left); else bets.delete(k);
+      balance += cents;
+    });
+    say('');
+    renderChips();
+    sync();
+  }
+
+  function clearBets() {
+    if (spin) return;
+    if (bets.size) Sound.remove();
+    if (!settled) balance += sumBets();
+    resetTable();
+    say('');
+    sync();
+  }
+
+  function repeatBets() {
+    if (spin || !lastBets.size) return;
+    if (settled) resetTable();
+    placeItems([...lastBets].map(([k, cents]) => [k, cents]));
+  }
+
+  function doubleBets() {
+    if (spin || settled || !bets.size) return;
+    placeItems([...bets].map(([k, cents]) => [k, cents]));
+  }
+
+  // ----- call bets -----
+  const CALLS = [
+    { name: 'Voisins du zéro', note: '17 numbers around 0', items: [['r0-2-3', 2], [splitKey(4, 7), 1], [splitKey(12, 15), 1], [splitKey(18, 21), 1], [splitKey(19, 22), 1], [splitKey(32, 35), 1], ['c25', 2]] },
+    { name: 'Tiers du cylindre', note: '12 numbers opposite 0', items: [splitKey(5, 8), splitKey(10, 11), splitKey(13, 16), splitKey(23, 24), splitKey(27, 30), splitKey(33, 36)].map(k => [k, 1]) },
+    { name: 'Orphelins', note: '8 numbers left over', items: [['s1', 1], [splitKey(6, 9), 1], [splitKey(14, 17), 1], [splitKey(17, 20), 1], [splitKey(31, 34), 1]] },
+    { name: 'Jeu zéro', note: '7 numbers next to 0', items: [[splitKey(0, 3), 1], [splitKey(12, 15), 1], [splitKey(32, 35), 1], ['s26', 1]] }
+  ];
+
+  function placeUnits(items) {
+    const cents = chipCents();
+    if (cents === null) { say('Enter a chip value above 0.'); Sound.error(); return; }
+    placeItems(items.map(([k, u]) => [k, u * cents]));
+  }
+
+  function buildCalls() {
+    const wrap = $('calls');
+    CALLS.forEach(cb => {
+      const units = cb.items.reduce((s, it) => s + it[1], 0);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ghost';
+      b.append(cb.name);
+      const sm = document.createElement('small');
+      sm.textContent = `${cb.note}, ${units} chips`;
+      b.appendChild(sm);
+      b.addEventListener('click', () => placeUnits(cb.items));
+      wrap.appendChild(b);
+    });
+
+    const sel = $('nb');
+    ORDER.slice().sort((a, b) => a - b).forEach(n => {
+      const o = document.createElement('option');
+      o.value = n; o.textContent = n;
+      sel.appendChild(o);
+    });
+    $('nbGo').addEventListener('click', () => {
+      const i = ORDER.indexOf(parseInt(sel.value, 10));
+      const items = [-2, -1, 0, 1, 2].map(o => ['s' + ORDER[(i + o + ORDER.length) % ORDER.length], 1]);
+      placeUnits(items);
+    });
+  }
+
+  function buildPresets() {
+    const wrap = $('presets');
+    [1, 5, 25, 100, 500].forEach(v => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pchip';
+      b.dataset.cents = String(v * 100);
+      b.textContent = v;
+      b.setAttribute('aria-label', `Set chip value to ${v}`);
+      applyTier(b, v * 100);
+      b.addEventListener('click', () => { amt.value = v; refreshChip(); store.set('roulette.chip', String(v)); Sound.pip(); });
+      wrap.appendChild(b);
+    });
+    const max = document.createElement('button');
+    max.type = 'button';
+    max.className = 'ghost';
+    max.textContent = 'All in';
+    max.setAttribute('aria-label', 'Set chip value to your whole balance');
+    max.addEventListener('click', () => {
+      if (balance <= 0) { say('You have no chips left.'); return; }
+      amt.value = String(Math.min(balance / 100, MAX_CHIP));
+      refreshChip();
+      Sound.pip();
+    });
+    wrap.appendChild(max);
+  }
+
+  // ----- table interaction -----
+  function spotOf(e) { return e.target.closest ? e.target.closest('.spot') : null; }
+
+  function hover(key) {
+    for (const n in glow) glow[n].classList.remove('on');
+    if (!key) { hintEl.textContent = DEFAULT_HINT; return; }
+    const b = CAT[key];
+    b.nums.forEach(n => glow[n].classList.add('on'));
+    hintEl.textContent = `${b.label}. Pays ${b.pays} to 1.`;
+  }
+
+  function wireTable() {
+    svg.addEventListener('click', e => { const s = spotOf(e); if (s) placeOne(s.dataset.key); });
+    svg.addEventListener('contextmenu', e => {
+      const s = spotOf(e);
+      if (s) { e.preventDefault(); removeBet(s.dataset.key); }
+    });
+    svg.addEventListener('pointerover', e => { const s = spotOf(e); hover(s ? s.dataset.key : null); });
+    svg.addEventListener('pointerleave', () => hover(null));
+    svg.addEventListener('focusin', e => { const s = spotOf(e); if (s) hover(s.dataset.key); });
+    svg.addEventListener('focusout', () => hover(null));
+    svg.addEventListener('keydown', e => {
+      const s = spotOf(e);
+      if (s && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); placeOne(s.dataset.key); }
+    });
+
+    undoBtn.addEventListener('click', undo);
+    clearBtn.addEventListener('click', clearBets);
+    repeatBtn.addEventListener('click', repeatBets);
+    doubleBtn.addEventListener('click', doubleBets);
+    $('reset').addEventListener('click', () => {
+      if (spin) return;
+      balance = START;
+      lastBets.clear();
+      resetTable();
+      say(`Bankroll reset to ${fmt(START)}.`);
+      sync();
+    });
+    amt.addEventListener('input', () => {
+      if (parseFloat(amt.value) > MAX_CHIP) {
+        amt.value = String(MAX_CHIP);
+        say('Chip value is limited to ' + MAX_CHIP.toLocaleString('en-US') + '.');
+      }
+      refreshChip();
+      store.set('roulette.chip', amt.value);
+    });
+    hover(null);
+  }
+
+  // =====================================================
+  // Spin
+  // =====================================================
+  function startSpin() {
+    if (spin) return;
+    if (settled) resetTable();
+    if (bets.size) lastBets = new Map(bets);
+    say('');
+
+    const reduce = reduceMotion();
+    const number = ORDER[randInt(ORDER.length)];
+    const idx = ORDER.indexOf(number);
+
+    const T = reduce ? 2.5 : 7.5 + Math.random() * 1.5;
+    const w0 = wheelAngle;
+    const W = TAU * (1.4 + Math.random() * 0.6);
+    const wEnd = w0 + W;
+    const b0 = ball.ang;
+    const turns = reduce ? 3 : 7 + Math.floor(Math.random() * 2);
+    const target = wEnd + pocketAngle(idx);
+    let bEnd = target + Math.round((b0 - turns * TAU - target) / TAU) * TAU;
+    while (bEnd > b0 - (turns - 0.5) * TAU) bEnd -= TAU;
+
+    spin = { t0: performance.now(), T, w0, W, wEnd, b0, bEnd, r0: ball.r, idx, number };
+    highlight = false;
+    ball.pocket = null;
+
+    spinBtns.forEach(b => { b.disabled = true; b.textContent = 'Ball is rolling'; });
+    Sound.spinStart();
+    setResult(null);
+    sync();
+  }
+
+  function updateSpin(now) {
+    const u = Math.min(1, (now - spin.t0) / 1000 / spin.T);
+    wheelAngle = spin.w0 + spin.W * (1 - (1 - u) * (1 - u));
+
+    let ang = spin.b0 + (spin.bEnd - spin.b0) * (1 - Math.pow(1 - u, 2.6));
+    let r;
+    if (u < 0.05) {
+      const k = u / 0.05;
+      r = spin.r0 + (R_TRACK - spin.r0) * (k * k * (3 - 2 * k));
+    } else if (u < 0.68) {
+      r = R_TRACK;
+    } else {
+      const v = (u - 0.68) / 0.32, q = 1 - v;
+      r = R_REST + (R_TRACK - R_REST) * q * q
+        + 0.03 * Math.abs(Math.sin(v * Math.PI * 3)) * q * q;
+      ang += 0.06 * Math.sin(v * Math.PI * 6) * q * q * q;
+    }
+    ball.ang = ang;
+    ball.r = r;
+
+    // sound: rolling rumble on the track, a tick each time the ball crosses a fret
+    const dtS = spin.lastT ? Math.max(0.001, (now - spin.lastT) / 1000) : 0.016;
+    const rel = ang - wheelAngle;
+    const speed = spin.lastAng === undefined ? 0 : Math.abs(ang - spin.lastAng) / dtS;
+    const relSpeed = spin.lastRel === undefined ? 0 : Math.abs(rel - spin.lastRel) / dtS;
+    spin.lastT = now; spin.lastAng = ang; spin.lastRel = rel;
+    const onTrack = r > R_OUT + 0.04;
+    const wheelSpeed = 2 * spin.W * (1 - u) / spin.T;
+    Sound.roll(speed, onTrack, wheelSpeed, ang);
+    if (!onTrack && u < 1) {
+      const k = Math.floor((rel + Math.PI / 2) / STEP + 0.5);
+      if (spin.lastK !== undefined && k !== spin.lastK && now - (spin.lastTick || 0) > 30) {
+        Sound.ballTick(relSpeed);
+        spin.lastTick = now;
+      }
+      spin.lastK = k;
+    } else {
+      spin.lastK = undefined;
+    }
+
+    if (u >= 1) finishSpin();
+  }
+
+  function finishSpin() {
+    wheelAngle = spin.wEnd;
+    ball.pocket = spin.idx;
+    ball.ang = wheelAngle + pocketAngle(spin.idx);
+    ball.r = R_REST;
+    highlight = true;
+    const n = spin.number;
+    spin = null;
+    Sound.stopRoll();
+    Sound.land();
+
+    spinBtns.forEach(b => { b.disabled = false; b.textContent = 'Spin again'; });
+    if (spinSource) spinSource.focus({ preventScroll: true });
+    record(n);
+    setResult(n);
+    settle(n);
+  }
+
+  function settle(n) {
+    const results = new Map();
+    let staked = 0, returned = 0, wins = 0;
+    bets.forEach((cents, key) => {
+      staked += cents;
+      if (CAT[key].nums.has(n)) {
+        results.set(key, 'win');
+        returned += cents * (CAT[key].pays + 1);
+        wins++;
+      } else {
+        results.set(key, 'lose');
+      }
+    });
+    balance += returned;
+    settled = { n, results };
+    showWinRing(n);
+    renderChips();
+
+    let text;
+    if (!staked) text = 'No bets were on the table.';
+    else if (wins) text = `Paid ${fmt(returned)} on ${wins} winning ${wins === 1 ? 'bet' : 'bets'}. Net ${signed(returned - staked)}.`;
+    else text = `No winning bets. You lost ${fmt(staked)}.`;
+    outcomeEl.textContent = text;
+    if (balance < 1) say('You are out of chips. Use Reset bankroll to keep playing.');
+    Sound.result(staked, returned);
+    sync();
+  }
+
+  // =====================================================
+  // Result panel and history
+  // =====================================================
+  const chip = $('chip'), numEl = $('num'), descEl = $('desc'), outcomeEl = $('outcome');
+  const histEl = $('hist'), emptyEl = $('empty'), tallyEl = $('tally');
+  const history = [];
+  const counts = { red: 0, black: 0, green: 0 };
+
+  function record(n) {
+    history.unshift(n);
+    counts[colorOf(n)]++;
+    if (history.length > 14) history.pop();
+    emptyEl.hidden = true;
+    histEl.textContent = '';
+    history.forEach(h => {
+      const li = document.createElement('li');
+      li.className = 'dot ' + colorOf(h);
+      li.textContent = h;
+      histEl.appendChild(li);
+    });
+    tallyEl.textContent = `Red ${counts.red}, black ${counts.black}, green ${counts.green}`;
+  }
+
+  function setResult(n) {
+    chip.classList.remove('pop', 'red', 'black', 'green');
+    if (n === null) {
+      numEl.textContent = '–';
+      descEl.textContent = 'The wheel is spinning.';
+      outcomeEl.textContent = '';
+      return;
+    }
+    const col = colorOf(n);
+    numEl.textContent = n;
+    void chip.offsetWidth;
+    chip.classList.add(col, 'pop');
+    const name = col[0].toUpperCase() + col.slice(1);
+    descEl.textContent = n === 0
+      ? 'Green zero.'
+      : `${name}, ${n % 2 === 0 ? 'even' : 'odd'}, ${n <= 18 ? 'low (1–18)' : 'high (19–36)'}.`;
+  }
+
+  spinBtns.forEach(b => b.addEventListener('click', () => { spinSource = b; startSpin(); }));
+
+  // =====================================================
+  // Loop and sizing
+  // =====================================================
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (spin) {
+      updateSpin(now);
+    } else {
+      if (!reduceMotion()) wheelAngle += IDLE * dt;
+      if (ball.pocket !== null) {
+        ball.ang = wheelAngle + pocketAngle(ball.pocket);
+        ball.r = R_REST;
+      }
+    }
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  function resize() {
+    const w = canvas.clientWidth;
+    if (!w) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    size = Math.round(w * dpr);
+    canvas.width = size;
+    canvas.height = size;
+    c = size / 2;
+    R = c * 0.94;
+    buildLayers();
+    draw();
+  }
+
+  // ----- init -----
+  const savedChip = parseFloat(store.get('roulette.chip'));
+  if (isFinite(savedChip) && savedChip > 0) amt.value = String(Math.min(savedChip, 100000000));
+  buildTable();
+  buildPresets();
+  buildCalls();
+  wireTable();
+  const soundBtn = $('sound');
+  const paintSound = () => {
+    const on = !Sound.isMuted();
+    soundBtn.textContent = on ? 'Sound on' : 'Sound off';
+    soundBtn.setAttribute('aria-pressed', String(on));
+  };
+  soundBtn.addEventListener('click', () => { Sound.setMuted(!Sound.isMuted()); paintSound(); Sound.pip(); });
+  paintSound();
+  sync();
+
+  new ResizeObserver(resize).observe(canvas);
+  resize();
+  requestAnimationFrame(frame);
+
+  if (document.fonts && document.fonts.load) {
+    document.fonts.load('600 20px "Bodoni Moda"').then(resize).catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
